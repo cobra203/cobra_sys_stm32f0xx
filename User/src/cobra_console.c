@@ -116,17 +116,11 @@ static void console_cmdline_touch(void)
 	gl_console.cmdline_size = 0;
 
 	for(i = 0; i < CONSOLE_EVENT_MAX; i++) {
-		if(CBA_FALSE == con->event_cache[i].event.info.active) {
+		if(CBA_FALSE == event_is_active(&con->event_cache[i].event)) {
 			con_event = &con->event_cache[i];
 			memcpy(con_event->cmdline, con->cmdline, cmd_size + 1);
 
-			con_event->event.info.active = CBA_TRUE;
-			con_event->event.info.priority = 3;
-			con_event->event.info.id = EV_CON_CMD;
-			con_event->event.info.status = EV_STATUS_NORMAL;
-			con_event->event.data = &con_event->cmdline;
-
-			con_event->touch = CBA_TRUE;
+			con_event->commit = CBA_TRUE;
 			return;
 		}
 	}
@@ -213,7 +207,7 @@ void console_init_early(void)
 #endif /* CBA_PLATFORM == PLATFORM_STM32 */
 	console_puts("\n+====================================================================+\n");
 	console_puts("| system  : cobra system template                                    |\n");
-	console_puts("| version : v0.1 - 19/12/16                                          |\n");
+	console_puts("| version : v0.2 - 20/01/08                                          |\n");
 	console_puts("| author  : sm723@qq.com                                             |\n");
 	console_puts("+====================================================================+\n");
 	CONSOLE_LOG(INFO, "%s ... OK\n", __func__);
@@ -225,9 +219,9 @@ static void _console_monitor_handle(void *arg)
 	uint8_t i = 0;
 
 	for(i = 0; i < CONSOLE_EVENT_MAX; i++) {
-		if(CBA_TRUE == event_cache[i].touch) {
-			event_cache[i].touch = CBA_FALSE;
-			event_commit(&event_cache[i].event);
+		if(CBA_TRUE == event_cache[i].commit) {
+			event_cache[i].commit = CBA_FALSE;
+			event_commit(&event_cache[i].event, EV_CON_CMD, 3, EV_STATE_NORMAL, &event_cache[i].cmdline);
 		}
 	}
 }

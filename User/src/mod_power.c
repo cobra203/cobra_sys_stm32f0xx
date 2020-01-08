@@ -27,6 +27,31 @@
 
 MOD_POWER_S gl_mod_power;
 
+static void _mod_power_ctrl(CBA_BOOL enable)
+{
+	if(enable) {
+		gl_mod_power.power_ctrl.doing(&gl_mod_power.power_ctrl, 1, 0);
+	}
+	else {
+		gl_mod_power.power_ctrl.doing(&gl_mod_power.power_ctrl, 0, 1);
+	}
+}
+
+static void _mod_power_swtich(CBA_BOOL old_status)
+{
+	EVENT_S *event = &gl_mod_power.key_power_event;
+
+	if(CBA_FALSE == event_is_active(event)) {
+		gl_mod_power.status.enable = old_status ? 0 : 1;
+		_mod_power_ctrl(gl_mod_power.status.enable);
+		POWER_LOG(INFO, "power switch ->%d\n", gl_mod_power.status.enable);
+		event_commit(event, EV_POWER_SWITCH, 3, EV_STATE_NORMAL, CBA_NULL);
+	}
+	else {
+		POWER_LOG(INFO, "event EV_POWER_SWITCH is busy\n");
+	}
+}
+
 static void _mod_power_key_power_process(BUTTON_S *button)
 {
 	uint8_t updata = CBA_FALSE;
@@ -36,25 +61,20 @@ static void _mod_power_key_power_process(BUTTON_S *button)
 		switch(button->state.effective) {
 		case ECT_LOOSE:
 			if(button->cont_count < 3) {
-				POWER_LOG(INFO, "power switch\n");
 				updata = CBA_TRUE;
 			}
 		case ECT_PRESSED:
 			break;
 		case ECT_FOCUSED:
 			if(button->cont_count == 3) {
-				POWER_LOG(INFO, "power switch\n");
 				updata = CBA_TRUE;
 			}
 			break;
 		}
 		button->state.active = 0;
     }
-	if(updata && CBA_FALSE == gl_mod_power.key_power_event.event.info.active) {
-		gl_mod_power.info.power = gl_mod_power.info.power ? 0 : 1;
-		gl_mod_power.key_power_event.event.info.active = CBA_TRUE;
-		gl_mod_power.key_power_event.event.info.priority = 3;
-		gl_mod_power.key_power_event.touch = CBA_TRUE;
+	if(updata) {
+		_mod_power_swtich(gl_mod_power.status.enable);
 	}
 }
 
@@ -79,12 +99,31 @@ static void _mod_power_monitor_handle(void *arg)
 
 	/* 3. logic process */
 	_mod_power_key_power_process(button);
-
-	if(CBA_TRUE == gl_mod_power.key_power_event.touch) {
-		gl_mod_power.key_power_event.touch = CBA_FALSE;
-		event_commit(&gl_mod_power.key_power_event.event);
-	}
 }
+
+static void mod_power_cmd(void *cmd)
+{
+	CMD_S *pcmd = (CMD_S *)cmd;
+
+	POWER_LOG(INFO, "============================================================\n");
+	if(0 == strlen(pcmd->arg)) {
+		POWER_LOG(INFO, "power: %d\n", gl_mod_power.status.enable);
+	}
+	else if(strncmp("on", pcmd->arg, strlen("on")) == 0 ||
+		strncmp("1", pcmd->arg, strlen("1")) == 0) {
+		_mod_power_swtich(CBA_FALSE);
+	}
+	else if(strncmp("off", pcmd->arg, strlen("off")) == 0 ||
+		strncmp("0", pcmd->arg, strlen("0")) == 0) {
+		_mod_power_swtich(CBA_TRUE);
+	}
+	else {
+		POWER_LOG(INFO, "Invalid Arguments\n");
+		POWER_LOG(INFO, "Usage: power [on|1]|[off|0]\n");
+	}
+	POWER_LOG(INFO, "============================================================\n");
+}
+CMD_CREATE_SIMPLE(power, mod_power_cmd);
 
 void mod_power_init(COBRA_SYS_S *sys)
 {
@@ -92,8 +131,9 @@ void mod_power_init(COBRA_SYS_S *sys)
 	NVIC_InitTypeDef	nvic_cfg = {0};
 	EXTI_InitTypeDef	exti_cfg = {0};
 
-    gl_mod_power.sys	= sys;
-	sys->mod_power		= &gl_mod_power;
+	sys->mod_power			= &gl_mod_power;
+	sys->status.power		= &gl_mod_power.status;
+	gl_mod_power.sys_status = &sys->status;
 
 	gl_mod_power.key_power_touch = mod_power_key_power_touch;
 	gl_mod_power.key_power_touch();
@@ -102,10 +142,6 @@ void mod_power_init(COBRA_SYS_S *sys)
 	gl_mod_power.key_power.interval.dithering	= 3;
 	gl_mod_power.key_power.interval.long_press  = 100;
 	gl_mod_power.key_power.interval.continuous  = 100;
-
-	/* init data of event to mod_power.info */
-	gl_mod_power.key_power_event.event.data = &gl_mod_power.info;
-	gl_mod_power.key_power_event.event.info.id = EV_POWER_SWITCH;
 
     gpio_cfg.GPIO_Mode   = GPIO_Mode_IN;
     gpio_cfg.GPIO_PuPd   = GPIO_PuPd_NOPULL;//GPIO_PuPd_UP;
@@ -130,11 +166,13 @@ void mod_power_init(COBRA_SYS_S *sys)
 	nvic_cfg.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&nvic_cfg);
 
-	led_init(&gl_mod_power.power_led, POWER_LED_PORT, POWER_LED_PIN);
+	led_init(&gl_mod_power.power_ctrl, POWER_CTRL_PORT, POWER_CTRL_PIN);
 
 	gl_mod_power.handle.name = "mod_power_monitor_handle";
 	gl_mod_power.handle.cb_data = &gl_mod_power.key_power;
 	timer_task_create(&gl_mod_power.handle, TMR_CYCLICITY, 10, 10, _mod_power_monitor_handle);
+
+	cmd_register(&cmd_power);
 
 	POWER_LOG(INFO, "%s ... OK\n", __func__);
 }

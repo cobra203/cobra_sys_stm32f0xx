@@ -56,6 +56,10 @@
 #include "stm32f0xx_misc.h"  /* High level functions for NVIC and SysTick (add-on to CMSIS functions) */
 
 /* Exported types ------------------------------------------------------------*/
+
+#undef HSE_VALUE
+#define HSE_VALUE    ((uint32_t)24000000) /*!< Value of the External oscillator in Hz */
+
 /* Exported constants --------------------------------------------------------*/
 /* Uncomment the line below to expanse the "assert_param" macro in the 
    Standard Peripheral Library drivers code */

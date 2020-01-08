@@ -5,8 +5,6 @@
  extern "C" {
 #endif
 
-struct console_event_s;
-
 #include <cobra_common.h>
 #include <cobra_timer.h>
 #include <cobra_console.h>
@@ -19,8 +17,8 @@ typedef enum sys_event_id_e
 
 typedef struct sys_status_s
 {
-	uint8_t	work				:1;
-	uint8_t						:8;
+	uint8_t	work;
+	struct power_status_s	*power;
 } SYS_STATUS_S;
 
 typedef struct cobra_sys_s

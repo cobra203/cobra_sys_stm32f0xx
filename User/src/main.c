@@ -103,12 +103,14 @@ void rcc_config(void)
 	if(RCC_WaitForHSEStartUp()) {
 		RCC_HSICmd(DISABLE);
 #if defined (STM32F303xE)
+		/* HSE = 8M */
 		/* PLLCLK = (PLL/1) * 9 = 72M */
 		RCC_PREDIV1Config(RCC_PREDIV1_Div1);
 		RCC_PLLConfig(RCC_PLLSource_PREDIV1, RCC_PLLMul_9);
 #elif defined (__STM32F0XX)
-		/* PLLCLK = (PLL/2) * 12 = 48M */
-		RCC_PLLConfig(RCC_PLLSource_HSI_Div2, RCC_PLLMul_6);
+		/* HSE = 24M */
+		/* PLLCLK = (PLL) * 2 = 48M */
+		RCC_PLLConfig(RCC_PLLSource_PREDIV1, RCC_PLLMul_2);
 #endif
 	}
 	else {

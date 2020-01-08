@@ -136,7 +136,8 @@ void timer_task_create(TIMER_TASK_S *task, TASK_TYPE_E type,
 
 void timer_task_release(TIMER_TASK_S *task)
 {
-	if(task && task->list.prev && task->list.next && !list_empty_careful(&(task->list))) {
+	if(task && task->info.active
+		&& task->list.prev && task->list.next && !list_empty_careful(&(task->list))) {
 		timer_head_lock = 1;
 		list_del(&(task->list));
 		timer_head_lock = 0;

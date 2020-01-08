@@ -28,8 +28,16 @@
 #define _EXTI_LINE(X)			EXTI_Line##X
 #define EXTI_LINE(X)			_EXTI_LINE(X)
 
+#define _UART_PORT(X)			USART##X
+#define UART_PORT(X)			_UART_PORT(X)
+
+#define _UART_IRQ(X)			USART##X##_IRQn
+#define UART_IRQ(X)				_UART_IRQ(X)
+
 /*************** cobra function define *************/
 /* for console */
+#define CONSOLE_UART_PORTx	2
+
 #define CONSOLE_TX_PORTx	A
 #define CONSOLE_TX_PINx		2
 #define CONSOLE_TX_AFx		1
@@ -37,7 +45,6 @@
 #define CONSOLE_RX_PORTx	A
 #define CONSOLE_RX_PINx		3
 #define CONSOLE_RX_AFx		1
-#define CONSOLE_RX_IRQ		USART2_IRQn
 
 /*************** cobra function define *************/
 
@@ -46,8 +53,8 @@
 #define KEY_POWER_PINx		5
 #define KEY_POWER_IRQ		EXTI4_15_IRQn
 
-#define	POWER_LED_PORTx		B
-#define POWER_LED_PINx		5
+#define	POWER_CTRL_PORTx	B
+#define POWER_CTRL_PINx		5
 
 #ifdef __cplusplus
 }

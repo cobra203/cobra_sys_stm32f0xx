@@ -32,33 +32,29 @@ COBRA_SYS_S gl_sys;
 int	cobra_event_process(EVENT_S *event)
 {
 	CMD_S parse;
-	LED_S *power_led = &gl_sys.mod_power->power_led;
 
-	switch(event->info.id) {
+	switch(event->id) {
 	case EV_CON_CMD:
 		assert_param((char *)event->data);
 		if(CBA_SUCCESS != cmd_parse((char *)event->data, &parse)) {
 			SYS_LOG(INFO, "Format error\n");
 			break;
 		}
-		parse.status = event->info.status;
+		parse.status = event->status.state;
 		if(CBA_SUCCESS != cmd_process(&parse)) {
 			SYS_LOG(INFO, "Invalid command\n");
 		}
-		event->info.status = parse.status;
+		event->status.state = parse.status;
 		break;
 
 	case EV_POWER_SWITCH:
-		if(*((uint8_t *)event->data)) {
+		if(gl_sys.status.power->enable) {
 			SYS_LOG(INFO, "Power On\n");
-			power_led->doing(power_led, 100, 1900);
 		}
 		else {
 			SYS_LOG(INFO, "Power Off\n");
-			power_led->doing(power_led, 0, 1);
 		}
 		break;
-
 
 	default:
 		break;
@@ -69,28 +65,22 @@ int	cobra_event_process(EVENT_S *event)
 
 static void _cobra_cmd_status_resp(void *data)
 {
-	if(CBA_FALSE == gl_sys.cmd_status_resp.event.info.active) {
-		gl_sys.cmd_status_resp.event.info.id = EV_CON_CMD;
-		gl_sys.cmd_status_resp.event.info.priority = 3;
-		gl_sys.cmd_status_resp.event.info.status = EV_STATUS_RESPONSE;
-		gl_sys.cmd_status_resp.event.info.active = CBA_TRUE;
-		snprintf(gl_sys.cmd_status_resp.cmdline, _CMDLINE_MAX_SIZE_, "sys_status %d", gl_sys.status.work);
-		event_commit(&gl_sys.cmd_status_resp.event);
-		if(gl_sys.cmd_status_resp_timeout.info.active) {
+	CONSOLE_EVENT_S *event = &gl_sys.cmd_status_resp;
+
+	if(CBA_FALSE == event_is_active(&event->event)) {
+		snprintf(event->cmdline, _CMDLINE_MAX_SIZE_, "sys_status %d", gl_sys.status.work);
+		event_commit(&event->event, EV_CON_CMD, 3, EV_STATE_RESPONSE, &event->cmdline);
 		timer_task_release(&gl_sys.cmd_status_resp_timeout);
-		}
 	}
 }
 
 static void _cobra_cmd_status_timeout(void *data)
 {
-	if(CBA_FALSE == gl_sys.cmd_status_resp.event.info.active) {
-		gl_sys.cmd_status_resp.event.info.id = EV_CON_CMD;
-		gl_sys.cmd_status_resp.event.info.priority = 3;
-		gl_sys.cmd_status_resp.event.info.status = EV_STATUS_TIMEOUT;
-		gl_sys.cmd_status_resp.event.info.active = CBA_TRUE;
-		snprintf(gl_sys.cmd_status_resp.cmdline, _CMDLINE_MAX_SIZE_, "sys_status %d", gl_sys.status.work);
-		event_commit(&gl_sys.cmd_status_resp.event);
+	CONSOLE_EVENT_S *event = &gl_sys.cmd_status_resp;
+
+	if(CBA_FALSE == event_is_active(&event->event)) {
+		snprintf(event->cmdline, _CMDLINE_MAX_SIZE_, "sys_status %d", gl_sys.status.work);
+		event_commit(&event->event, EV_CON_CMD, 3, EV_STATE_TIMEOUT, &event->cmdline);
 	}
 }
 
@@ -99,8 +89,8 @@ static void cobra_sys_status(void *cmd)
 	CMD_S *pcmd = (CMD_S *)cmd;
 	uint32_t delay = 0;
 
-	if(EV_STATUS_NORMAL == pcmd->status && strcmp("delay", pcmd->arg) < 0) {
-		pcmd->status = EV_STATUS_REQUEST;
+	if(EV_STATE_NORMAL == pcmd->status && strncmp("delay", pcmd->arg, strlen("delay")) == 0) {
+		pcmd->status = EV_STATE_REQUEST;
 		sscanf(&pcmd->arg[sizeof("delay")], "%d", &delay);
 
 		timer_task_create(&gl_sys.cmd_status_resp_task, TMR_ONCE, delay, 0, _cobra_cmd_status_resp);
@@ -110,11 +100,11 @@ static void cobra_sys_status(void *cmd)
 
 	SYS_LOG(INFO, "============================================================\n");
 	switch(pcmd->status) {
-	case EV_STATUS_NORMAL:
-		SYS_LOG(INFO, "STATUS: work=%d\n", gl_sys.status.work);
+	case EV_STATE_NORMAL:
+		SYS_LOG(INFO, "status: work=%d\n", gl_sys.status.work);
 		break;
-	case EV_STATUS_RESPONSE:
-		SYS_LOG(INFO, "STATUS: work=%s\n", pcmd->arg);
+	case EV_STATE_RESPONSE:
+		SYS_LOG(INFO, "status: work=%s\n", pcmd->arg);
 		break;
 	default:
 		SYS_LOG(INFO, "%s_%s: timeout\n", pcmd->prefix, pcmd->subcmd);
@@ -154,7 +144,6 @@ void cobra_sys_init(void)
 	gl_sys.event_process = cobra_event_process;
 	gl_sys.sys_handle = cobra_sys_handle;
 
-	gl_sys.cmd_status_resp.event.data = gl_sys.cmd_status_resp.cmdline;
 	gl_sys.cmd_status_resp_task.name = "cobra_cmd_status_resp";
 	gl_sys.cmd_status_resp_task.cb_data = CBA_NULL;
 	gl_sys.cmd_status_resp_timeout.name = "cobra_cmd_status_timeout";
