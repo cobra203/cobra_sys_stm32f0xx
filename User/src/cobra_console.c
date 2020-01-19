@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <cobra_console.h>
 #include <cobra_sys.h>
+#include <cobra_cmd.h>
 
 #if (LOG_CONSOLE_LEVEL > LOG_LEVEL_NOT)
 #define CONSOLE_INFO(fm, ...) { \
@@ -85,9 +86,12 @@ void console_send(char *data, uint8_t size)
 /* for console log *********************************************/
 void console_cmdline_clean(void)
 {
-	int i = gl_console.cmdline_size + sizeof(CONSOLE_TAG);
+	char size = gl_console.tab_buffer_size ? gl_console.tab_buffer_size : gl_console.cmdline_size;
+
+	size += sizeof(CONSOLE_TAG);
+
 	console_send_byte('\r');
-	while(i--) {
+	while(size--) {
 		console_send_byte(' ');
 	}
 	console_send_byte('\r');
@@ -95,13 +99,14 @@ void console_cmdline_clean(void)
 
 void console_cmdline_restore(void)
 {
+	char *line = gl_console.tab_buffer_size ? gl_console.tab_buffer : gl_console.cmdline;
+	char size = gl_console.tab_buffer_size ? gl_console.tab_buffer_size : gl_console.cmdline_size;
+
 	console_puts(CONSOLE_TAG);
-	gl_console.cmdline[gl_console.cmdline_size] = 0;
-	console_send(gl_console.cmdline, gl_console.cmdline_size);
+	console_send(line, size);
 }
 /***************************************************************/
 /***************************************************************/
-
 static void console_cmdline_touch(void)
 {
 	CONSOLE_S *con = &gl_console;
@@ -124,12 +129,104 @@ static void console_cmdline_touch(void)
 			return;
 		}
 	}
-	CONSOLE_LOG(INFO, "console event cache is full\n");
+	CONSOLE_LOG(INFO, "console event cache is full\r\n");
+}
+
+static void _console_tab_buffer_to_cmdline(void)
+{
+	memcpy(gl_console.cmdline, gl_console.tab_buffer, gl_console.tab_buffer_size + 1);
+	gl_console.cmdline_size = gl_console.tab_buffer_size;
+	gl_console.tab_buffer_size = 0;
+	gl_console.tab_buffer[0] = 0;
+	gl_console.tab_last = -1;
+}
+
+static void console_cmdline_backspace(void)
+{
+	if(gl_console.tab_buffer_size > 0) {
+		console_puts("\b \b");
+		gl_console.tab_buffer_size--;
+		gl_console.tab_buffer[gl_console.tab_buffer_size] = 0;
+		_console_tab_buffer_to_cmdline();
+	}
+	else if(gl_console.cmdline_size > 0){
+		console_puts("\b \b");
+		gl_console.cmdline_size--;
+		gl_console.cmdline[gl_console.cmdline_size] = 0;
+	}
+}
+
+static void console_cmdline_tab(void)
+{
+	static CBA_BOOL next = CBA_FALSE;
+	CMD_S *pos;
+	uint8_t i = 0;
+	char tab_tmp[_PREFIX_SIZE_ + _SUBCMD_SIZE_] = {0};
+	CBA_BOOL found = CBA_FALSE;
+
+	if(!next) {
+		gl_console.tab_last = -1;
+	}
+
+	if(gl_console.cmd_list) {
+		list_for_each_entry(pos, gl_console.cmd_list, CMD_S, list) {
+			if(strlen(pos->subcmd)) {
+				snprintf(tab_tmp, sizeof(tab_tmp), "%s_%s", pos->prefix, pos->subcmd);
+			}
+			else {
+				snprintf(tab_tmp, sizeof(tab_tmp), "%s", pos->prefix);
+			}
+			if(gl_console.cmdline_size < strlen(tab_tmp)) {
+				if(0 == strncmp(tab_tmp, gl_console.cmdline, gl_console.cmdline_size)) {
+					if(i > gl_console.tab_last) {
+						if(!found) {
+							memcpy(gl_console.tab_buffer, tab_tmp, strlen(tab_tmp) + 1);
+							console_cmdline_clean();
+							gl_console.tab_buffer_size = strlen(gl_console.tab_buffer);
+							console_cmdline_restore();
+							gl_console.tab_last = i;
+							found = CBA_TRUE;
+							next = CBA_FALSE;
+						}
+						else {
+							next = CBA_TRUE;
+							return;
+						}
+					}
+				}
+			}
+			i++;
+		}
+	}
+}
+
+static void console_cmdline_enter(void)
+{
+	console_send_byte('\n');
+	console_puts(CONSOLE_TAG);
+	if(gl_console.tab_buffer_size) {
+		_console_tab_buffer_to_cmdline();
+	}
+	console_cmdline_touch();
+}
+
+static void console_cmdline_normal(char byte)
+{
+	if(gl_console.tab_buffer_size) {
+		_console_tab_buffer_to_cmdline();
+	}
+	gl_console.cmdline[gl_console.cmdline_size++] = byte;
+	gl_console.cmdline[gl_console.cmdline_size] = 0;
+	console_send_byte(byte);
 }
 
 void console_init_early(void)
 {
-	gl_console.cmdline_touch = console_cmdline_touch;
+	gl_console.cmdline_tab = console_cmdline_tab;
+	gl_console.cmdline_backspace = console_cmdline_backspace;
+	gl_console.cmdline_enter = console_cmdline_enter;
+	gl_console.cmdline_normal = console_cmdline_normal;
+	gl_console.cmd_list = CBA_NULL;
 
 #if (CBA_PLATFORM == PLATFORM_STM32)
 	GPIO_InitTypeDef		gpio_cfg;
@@ -152,6 +249,12 @@ void console_init_early(void)
 	GPIO_Init(CONSOLE_RX_PORT, &gpio_cfg);
 
 	/* 2. Configuration USART interface */
+	/* Enable USART2 Clock */
+#ifdef STM32F303xE
+	RCC_USARTCLKConfig(RCC_USART2CLK_SYSCLK);
+#endif
+	RCC_ClockCmd(CONSOLE_RCC_APB, ENABLE);
+
 	usart_cfg.USART_BaudRate = CONSOLE_UART_BAUD;
 	usart_cfg.USART_WordLength = USART_WordLength_8b;
 	usart_cfg.USART_StopBits = USART_StopBits_1;
@@ -207,10 +310,10 @@ void console_init_early(void)
 #endif /* CBA_PLATFORM == PLATFORM_STM32 */
 	console_puts("\n+====================================================================+\n");
 	console_puts("| system  : cobra system template                                    |\n");
-	console_puts("| version : v0.2 - 20/01/08                                          |\n");
+	console_puts("| version : v0.3 - 20/01/19                                          |\n");
 	console_puts("| author  : sm723@qq.com                                             |\n");
 	console_puts("+====================================================================+\n");
-	CONSOLE_LOG(INFO, "%s ... OK\n", __func__);
+	CONSOLE_LOG(INFO, "%s ... OK\r\n", __func__);
 }
 
 static void _console_monitor_handle(void *arg)
@@ -232,6 +335,6 @@ void console_init(void)
 	gl_console.handle.cb_data = CBA_NULL;
 	timer_task_create(&gl_console.handle, TMR_CYCLICITY, 10, 100, _console_monitor_handle);
 
-	CONSOLE_LOG(INFO, "%s ... OK\n", __func__);
+	CONSOLE_LOG(INFO, "%s ... OK\r\n", __func__);
 }
 

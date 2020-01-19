@@ -36,18 +36,18 @@ void event_monitor_handle(void)
 		list_for_each_entry_safe(pos, tmp, &event_head.list, EVENT_S, list) {
 			if(0 == pos->status.priority) {
 				if(EV_STATE_WAITFOR > pos->status.state) {
-					EVENT_LOG(DEBUG, "[%d]EV_STATE_%s: process\n",
+					EVENT_LOG(DEBUG, "[%d]EV_STATE_%s: process\r\n",
 							pos->id, pos->status.state ? "REQUEST" : "NORMAL");
 					gl_sys.event_process(pos);
 
 					if(EV_STATE_NORMAL == pos->status.state) {
-						EVENT_LOG(DEBUG, "[%d]EV_STATE_NORMAL: completed\n", pos->id);
+						EVENT_LOG(DEBUG, "[%d]EV_STATE_NORMAL: completed\r\n", pos->id);
 						list_del(&pos->list);
 						pos->status.active = CBA_FALSE;
 					}
 					else {
 						pos->status.state = EV_STATE_WAITFOR;
-						EVENT_LOG(DEBUG, "[%d]: state->EV_STATE_WAITFOR\n", pos->id);
+						EVENT_LOG(DEBUG, "[%d]: state->EV_STATE_WAITFOR\r\n", pos->id);
 					}
 					return;
 				}
@@ -59,15 +59,15 @@ void event_monitor_handle(void)
 				/* Note: for the same event, only one result event can be generated */
 				/*       in either response or timeout                              */
 				/*       EV_STATE_WAITFOR < pos->status.state                       */
-				EVENT_LOG(DEBUG, "[%d]EV_STATE_%s: process\n",
+				EVENT_LOG(DEBUG, "[%d]EV_STATE_%s: process\r\n",
 						pos->id, EV_STATE_RESPONSE == pos->status.state ? "RESPONSE" : "TIMEOUT");
 
 				list_for_each_entry_safe(pos_req, tmp_req, &event_head.list, EVENT_S, list) {
 					if(EV_STATE_WAITFOR == pos_req->status.state &&
 							pos_req->id == pos->id) {
-							EVENT_LOG(DEBUG, "[%d]EV_STATE_WAITFOR: matched\n", pos->id);
+							EVENT_LOG(DEBUG, "[%d]EV_STATE_WAITFOR: matched\r\n", pos->id);
 						gl_sys.event_process(pos);
-						EVENT_LOG(DEBUG, "[%d]EV_STATE_%s: completed\n",
+						EVENT_LOG(DEBUG, "[%d]EV_STATE_%s: completed\r\n",
 								pos->id, EV_STATE_RESPONSE == pos->status.state ? "RESPONSE" : "TIMEOUT");
 						list_del(&pos_req->list);
 						pos_req->status.active = CBA_FALSE;
@@ -76,7 +76,7 @@ void event_monitor_handle(void)
 						return;
 					}
 				}
-				EVENT_LOG(DEBUG, "[%d]EV_STATE_%s: not matched, ignored\n",
+				EVENT_LOG(DEBUG, "[%d]EV_STATE_%s: not matched, ignored\r\n",
 						pos->id, EV_STATE_RESPONSE == pos->status.state ? "RESPONSE" : "TIMEOUT");
 				list_del(&pos->list);
 				pos->status.active = CBA_FALSE;
@@ -108,5 +108,5 @@ void event_commit(EVENT_S *event, uint16_t id, uint8_t priority, uint8_t state, 
 void event_init(void)
 {
 	INIT_LIST_HEAD(&event_head.list);
-	EVENT_LOG(INFO, "%s ... OK\n", __func__);
+	EVENT_LOG(INFO, "%s ... OK\r\n", __func__);
 }

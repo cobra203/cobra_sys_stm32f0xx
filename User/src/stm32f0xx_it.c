@@ -114,7 +114,7 @@ void SysTick_Handler(void)
 {
 }*/
 
-void USART2_IRQHandler(void)
+void USART_IRQHandler(void)
 {
 	char byte;
 
@@ -122,22 +122,20 @@ void USART2_IRQHandler(void)
 		byte = USART_ReceiveData(CONSOLE_UART_COM);
 
 		if(byte == '\r') {
-			console_send_byte('\n');
-			console_puts(CONSOLE_TAG);
-			gl_console.cmdline[gl_console.cmdline_size] = 0;
-			gl_console.cmdline_touch();
+			gl_console.cmdline_enter();
 			return;
 		}
 		if(gl_console.cmdline_size < _CMDLINE_MAX_SIZE_ - 1) {
-			if('\b' == byte) {
-				if(gl_console.cmdline_size > 0) {
-					console_puts("\b \b");
-					gl_console.cmdline_size--;
-				}
-			}
-			else {
-				gl_console.cmdline[gl_console.cmdline_size++] = byte;
-				console_send_byte(byte);
+			switch(byte) {
+			case '\t':
+				gl_console.cmdline_tab();
+				break;
+			case '\b':
+				gl_console.cmdline_backspace();
+				break;
+			default:
+				gl_console.cmdline_normal(byte);
+				break;
 			}
 			RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM3, ENABLE);
 			TIM_SetCounter(TIM3, 0);
@@ -160,8 +158,9 @@ void EXTI15_10_IRQHandler(void)
 {
 	if(EXTI_GetITStatus(KEY_POWER_EXTI_LINE) != RESET) {
 		EXTI_ClearITPendingBit(KEY_POWER_EXTI_LINE);
-		gl_mod_power.key_power_touch();
-
+		if(gl_sys.mod_power) {
+			gl_mod_power.key_power_touch();
+		}
 	}
 }
 #endif
@@ -171,8 +170,9 @@ void EXTI4_15_IRQHandler(void)
 {
 	if(EXTI_GetITStatus(KEY_POWER_EXTI_LINE) != RESET) {
 		EXTI_ClearITPendingBit(KEY_POWER_EXTI_LINE);
-		gl_mod_power.key_power_touch();
-
+		if(gl_sys.mod_power) {
+			gl_mod_power.key_power_touch();
+		}
 	}
 }
 #endif

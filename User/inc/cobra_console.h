@@ -18,6 +18,7 @@
 
 /* ============= define console log of module =============*/
 #define LOG_CONSOLE_LEVEL	LOG_LEVEL_INFO
+#define LOG_MAIN_LEVEL		LOG_LEVEL_INFO
 #define LOG_CMD_LEVEL		LOG_LEVEL_INFO
 #define LOG_TIMER_LEVEL		LOG_LEVEL_INFO
 #define LOG_EVENT_LEVEL		LOG_LEVEL_INFO
@@ -48,6 +49,10 @@
 #define CONSOLE_RX_AF		GPIO_AF(CONSOLE_RX_AFx)
 
 #define CONSOLE_RX_IRQ		UART_IRQ(CONSOLE_UART_PORTx)
+#define USART_IRQHandler	UASRT_IRQ_HANDLER(CONSOLE_UART_PORTx)
+
+#define CONSOLE_RCC_APB		UART_RCC(CONSOLE_UART_APB, CONSOLE_UART_PORTx)
+#define RCC_ClockCmd		RCC_CLOCKCMD(CONSOLE_UART_APB)
 
 typedef struct console_event_s
 {
@@ -60,10 +65,17 @@ typedef struct console_s
 {
 	char				cmdline[_CMDLINE_MAX_SIZE_];
 	char				cmdline_size;
+	char				tab_buffer[_PREFIX_SIZE_ + _SUBCMD_SIZE_];
+	char				tab_buffer_size;
+	int					tab_last;
 	CONSOLE_EVENT_S		event_cache[CONSOLE_EVENT_MAX];
 	TIMER_TASK_S		handle;
+	LIST_S				*cmd_list;
 
-	void	(*cmdline_touch)	(void);
+	void	(*cmdline_tab)			(void);
+	void	(*cmdline_backspace)	(void);
+	void	(*cmdline_enter)		(void);
+	void	(*cmdline_normal)		(char);
 } CONSOLE_S;
 
 extern CONSOLE_S gl_console;

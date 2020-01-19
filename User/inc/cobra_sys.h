@@ -17,7 +17,7 @@ typedef enum sys_event_id_e
 
 typedef struct sys_status_s
 {
-	uint8_t	work;
+	uint32_t	flag;
 	struct power_status_s	*power;
 } SYS_STATUS_S;
 
@@ -27,9 +27,9 @@ typedef struct cobra_sys_s
 	struct timer_task_s		handle;
 	struct mod_power_s		*mod_power;
 
-	struct console_event_s	cmd_status_resp;
-	struct timer_task_s		cmd_status_resp_task;
-	struct timer_task_s		cmd_status_resp_timeout;
+	struct console_event_s	cmd_test_resp;
+	struct timer_task_s		cmd_test_resp_task;
+	struct timer_task_s		cmd_test_resp_timeout;
 
 	int			(*event_process)	(EVENT_S *event);
 	void		(*sys_handle)		(void *args);

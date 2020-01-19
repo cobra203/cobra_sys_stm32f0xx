@@ -2440,6 +2440,9 @@
                 <name>$PROJ_DIR$\Driver\StdPeriph_Driver\src\stm32f0xx_gpio.c</name>
             </file>
             <file>
+                <name>$PROJ_DIR$\Driver\StdPeriph_Driver\src\stm32f0xx_iwdg.c</name>
+            </file>
+            <file>
                 <name>$PROJ_DIR$\Driver\StdPeriph_Driver\src\stm32f0xx_misc.c</name>
             </file>
             <file>

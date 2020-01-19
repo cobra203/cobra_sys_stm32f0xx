@@ -61,7 +61,7 @@ static void _timer_touch_process(TIMER_TASK_S *task)
 	void *cb_data = task->cb_data;
 
 	if(task->info.type == TMR_ONCE) {
-		TIMER_LOG(DEBUG, "task_touch[%d] : %s\n", task->info.type, task->name);
+		TIMER_LOG(DEBUG, "task_touch[%d] : %s\r\n", task->info.type, task->name);
 	}
 
 	switch(task->info.type) {
@@ -106,11 +106,11 @@ static void timer_task_dump(void *cmd)
 	TIMER_TASK_S *pos;
 	int i = 0;
 
-	TIMER_LOG(INFO, "============================================================\n");
+	TIMER_LOG(INFO, "============================================================\r\n");
 	list_for_each_entry(pos, &timer_task_head.list, TIMER_TASK_S, list) {
-		TIMER_LOG(INFO, "task_list[%02d]: [0x%08x][%d] %s\n", i++, &(pos->list), pos->info.type, pos->name);
+		TIMER_LOG(INFO, "task_list[%02d]: [0x%08x][%d] %s\r\n", i++, &(pos->list), pos->info.type, pos->name);
 	}
-	TIMER_LOG(INFO, "============================================================\n");
+	TIMER_LOG(INFO, "============================================================\r\n");
 }
 CMD_CREATE(timer, task_dump, timer_task_dump);
 
@@ -128,13 +128,13 @@ void timer_task_create(TIMER_TASK_S *task, TASK_TYPE_E type,
 	timer_head_lock = 0;
 
 	if(type != TMR_DELAY) {
-		TIMER_LOG(DEBUG, "task_create[%d]: %s\n", type, task->name);
+		TIMER_LOG(DEBUG, "task_create[%d]: %s\r\n", type, task->name);
 	}
 
 	task->info.active = CBA_TRUE;
 }
 
-void timer_task_release(TIMER_TASK_S *task)
+CBA_BOOL timer_task_release(TIMER_TASK_S *task)
 {
 	if(task && task->info.active
 		&& task->list.prev && task->list.next && !list_empty_careful(&(task->list))) {
@@ -144,8 +144,12 @@ void timer_task_release(TIMER_TASK_S *task)
 		task->info.active = CBA_FALSE;
 
 		if(task->info.type != TMR_DELAY) {
-			TIMER_LOG(DEBUG, "task_release[%d]: %s\n", task->info.type, task->name);
+			TIMER_LOG(DEBUG, "task_release[%d]: %s\r\n", task->info.type, task->name);
 		}
+		return CBA_TRUE;
+	}
+	else {
+		return CBA_FALSE;
 	}
 }
 
@@ -162,8 +166,50 @@ void delay_ms(uint32_t ms)
     timer_task_release(&task);
 }
 
+/* Function call time correction */
+#define DELAY_CORRECTION	5
+/* Use when it is greater than 10us */
+void delay_us(uint16_t us)
+{
+	//TIM_SetCounter(TIM2, us * 4 - DELAY_CORRECTION);
+	//TIM_Cmd(TIM2, ENABLE);
+	//while(!TIM_GetFlagStatus(TIM2, TIM_FLAG_Update));
+	//TIM_ClearFlag(TIM2, TIM_FLAG_Update);
+	//TIM_Cmd(TIM2, DISABLE);
+
+	TIM_PORT(DELAY_NS_TIM)->CNT = us * 4 - DELAY_CORRECTION;
+	TIM_PORT(DELAY_NS_TIM)->CR1 |= TIM_CR1_CEN;
+	while(!(TIM_PORT(DELAY_NS_TIM)->SR & TIM_FLAG_Update));
+	TIM_PORT(DELAY_NS_TIM)->SR = (uint16_t)~TIM_FLAG_Update;
+	TIM_PORT(DELAY_NS_TIM)->CR1 &= (uint16_t)(~((uint16_t)TIM_CR1_CEN));
+}
+
+static void timer_iwdg_init(void)
+{
+#ifdef FUNC_WATCHDOG_EN
+	IWDG_WriteAccessCmd(IWDG_WriteAccess_Enable);
+	/* 40kHz/32 = 1.25kHz */
+	IWDG_SetPrescaler(IWDG_Prescaler_32);
+	/* 1.25kHz/125 = 0.01kHz = 10Hz */
+	IWDG_SetReload(650); //500ms
+	IWDG_ReloadCounter();
+	IWDG_Enable();
+	TIMER_LOG(INFO, "%s ... OK\r\n", __func__);
+#endif
+}
+
+static inline void timer_iwdg_feed(void)
+{
+#ifdef FUNC_WATCHDOG_EN
+	//IWDG_ReloadCounter();
+	IWDG->KR = (uint16_t)0xAAAA;
+#endif
+}
+
 void timer_init(void) /* 1ms timer */
 {
+	TIM_TimeBaseInitTypeDef tim_basecfg;
+
 #if (CBA_PLATFORM == PLATFORM_STM8)
 	TIM1_DeInit();
     TIM1_TimeBaseInit(16,TIM1_COUNTERMODE_DOWN, 948 ,0);
@@ -173,7 +219,9 @@ void timer_init(void) /* 1ms timer */
     TIM1_Cmd(ENABLE);
 
 #elif (CBA_PLATFORM == PLATFORM_STM32)
-	SysTick_CLKSourceConfig(SysTick_CLKSource_HCLK_Div8);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+	/* sysclk = 48MHz */
+	SysTick_CLKSourceConfig(SysTick_CLKSource_HCLK);
 #if defined (__STM32F30X)
     SysTick_Config(72000 - 1);
 #elif defined (__STM32F0XX)
@@ -191,11 +239,27 @@ void timer_init(void) /* 1ms timer */
 	setitimer(ITIMER_REAL, &itv, &oldtv);
 
 #endif
+
+	RCC_CLOCKCMD(DELAY_NS_TIM_APB)(TIM_RCC(DELAY_NS_TIM_APB, DELAY_NS_TIM), ENABLE);
+#if defined (STM32F303xE)
+	tim_basecfg.TIM_Prescaler = (72/4 - 1); // 4MHz, 0.25us
+#elif defined (STM32F051)
+	tim_basecfg.TIM_Prescaler = (48/4 - 1); // 4MHz, 0.25us
+#endif
+	tim_basecfg.TIM_Prescaler = (48/4 - 1); // 4MHz, 0.25us
+	tim_basecfg.TIM_Period = 0xffff;
+	tim_basecfg.TIM_ClockDivision = TIM_CKD_DIV1;
+	tim_basecfg.TIM_CounterMode = TIM_CounterMode_Down;
+	TIM_TimeBaseInit(TIM_PORT(DELAY_NS_TIM), &tim_basecfg);
+	TIM_ClearITPendingBit(TIM_PORT(DELAY_NS_TIM), TIM_IT_Update);
+
 	INIT_LIST_HEAD(&timer_task_head.list);
+
+	timer_iwdg_init();
 
 	cmd_register(&cmd_timer_task_dump);
 
-	TIMER_LOG(INFO, "%s ... OK\n", __func__);
+	TIMER_LOG(INFO, "%s ... OK\r\n", __func__);
 }
 
 void timer_itc(int sig)
@@ -203,6 +267,7 @@ void timer_itc(int sig)
 	TIMER_TASK_S *pos;
 
 	if(!timer_head_lock) {
+		timer_iwdg_feed();
 		list_for_each_entry(pos, &timer_task_head.list, TIMER_TASK_S, list) {
 			if(pos->info.active && pos->delay) {
 				pos->delay--;

@@ -37,20 +37,33 @@
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
+#if (LOG_MAIN_LEVEL > LOG_LEVEL_NOT)
+#define MAIN_INFO(fm, ...) { \
+		console_cmdline_clean(); \
+		console("MAIN    : " fm, ##__VA_ARGS__) \
+		console_cmdline_restore(); \
+	}
+#else
+#define MAIN_INFO(fm, ...)
+#endif
+
+#if (LOG_MAIN_LEVEL > LOG_LEVEL_INFO)
+#define MAIN_DEBUG(fm, ...) { \
+		console_cmdline_clean(); \
+		console("MAIN    : " fm, ##__VA_ARGS__) \
+		console_cmdline_restore(); \
+	}
+#else
+#define MAIN_DEBUG(fm, ...)
+#endif
+
+#define MAIN_LOG(level, fm, ...) MAIN_##level(fm, ##__VA_ARGS__)
+
 /* Private variables ---------------------------------------------------------*/
 /* Private function prototypes -----------------------------------------------*/
 /* Private functions ---------------------------------------------------------*/
 static void rcc_clock_cmd(void)
 {
-	/* Enable Syscfg Clock */
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
-
-	/* Enable USART2 Clock */
-#ifdef STM32F303xE
-	RCC_USARTCLKConfig(RCC_USART2CLK_SYSCLK);
-#endif
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_USART2, ENABLE);
-
 	/* Enable GPIO Clock */
 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_GPIOA, ENABLE);
 #ifdef STM32F303xE
@@ -138,7 +151,6 @@ void rcc_config(void)
 
 #endif /* 0 */
 	rcc_clock_cmd();
-
 }
 
 /**

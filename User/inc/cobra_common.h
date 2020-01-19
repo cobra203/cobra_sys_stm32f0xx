@@ -36,6 +36,7 @@
 #include <stm32f30x_tim.h>
 #include <stm32f30x_exti.h>
 #include <stm32f30x_syscfg.h>
+#include <stm32f30x_iwdg.h>
 #elif defined (__STM32F0XX)
 #include <stm32f0xx.h>
 #include <stm32f0xx_rcc.h>
@@ -45,6 +46,7 @@
 #include <stm32f0xx_tim.h>
 #include <stm32f0xx_exti.h>
 #include <stm32f0xx_syscfg.h>
+#include <stm32f0xx_iwdg.h>
 #endif
 
 #elif (CBA_PLATFORM == PLATFORM_LINUX)

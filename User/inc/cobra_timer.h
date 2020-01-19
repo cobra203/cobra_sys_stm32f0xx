@@ -8,6 +8,8 @@
 #include <cobra_common.h>
 #include <cobra_list.h>
 
+#define FUNC_WATCHDOG_EN
+
 #define TASK_NAME_SIZE 32
 typedef void (*CALLBACK_F) (void *);
 
@@ -43,9 +45,10 @@ void timer_task_handle(void);
 void timer_task_create(TIMER_TASK_S *task, TASK_TYPE_E type,
 							uint32_t delay, uint32_t reload, CALLBACK_F cb);
 
-void timer_task_release(TIMER_TASK_S *task);
+CBA_BOOL timer_task_release(TIMER_TASK_S *task);
 
-void delay_ms(uint32_t time);
+void delay_ms(uint32_t ms);
+void delay_us(uint16_t us);
 
 void timer_init(void);
 void timer_itc(int sig);

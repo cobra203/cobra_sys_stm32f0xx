@@ -10,6 +10,7 @@
 typedef enum btn_effective_e
 {
     ECT_LOOSE = 0,
+	ECT_UNOCCUPIED,
     ECT_PRESSED,
     ECT_FOCUSED,
 } BTN_EFFECTIVE_E;
@@ -34,14 +35,16 @@ typedef struct btn_interval_s
 {
     uint8_t     dithering;	/* interval for dithering elimination */
     uint16_t    long_press;	/* interval for first into focused status */
-	uint8_t     continuous;	/* interval for continuous press on focused status */
+	uint16_t    continuous;	/* interval for continuous press on focused status */
+	uint16_t    unoccupied; /* interval for loose */
 } BTN_INTERVAL_S;
 
 typedef struct button_s
 {
     BTN_STATE_S     state;
     BTN_INTERVAL_S  interval;
-	uint16_t		cont_count;		/* count of the continuous press */
+	uint16_t		loose_count;	/* count of the unoccupied loose */
+	uint16_t		focused_count;	/* count of the continuous press */
 	uint8_t			detect_count;	/* count of need to detect from pin */
     int             (*check_active)(struct button_s *);
 } BUTTON_S;

@@ -109,19 +109,19 @@ CBA_BOOL cmd_process(CMD_S *parse)
 
 			pos->status = parse->status;
 			if(strlen(parse->subcmd)) {
-				CMD_LOG(DEBUG, "%s_%s: process start status[%d]\n", pos->prefix, pos->subcmd, pos->status);
+				CMD_LOG(DEBUG, "%s_%s: process start status[%d]\r\n", pos->prefix, pos->subcmd, pos->status);
 			}
 			else {
-				CMD_LOG(DEBUG, "%s: process start status[%d]\n", pos->prefix, pos->status);
+				CMD_LOG(DEBUG, "%s: process start status[%d]\r\n", pos->prefix, pos->status);
 			}
 			pos->process(pos);
 			parse->status = pos->status;
 
 			if(strlen(parse->subcmd)) {
-				CMD_LOG(DEBUG, "%s_%s: process end status[%d]\n", pos->prefix, pos->subcmd, pos->status);
+				CMD_LOG(DEBUG, "%s_%s: process end status[%d]\r\n", pos->prefix, pos->subcmd, pos->status);
 			}
 			else {
-				CMD_LOG(DEBUG, "%s: process end status[%d]\n", pos->prefix, pos->status);
+				CMD_LOG(DEBUG, "%s: process end status[%d]\r\n", pos->prefix, pos->status);
 			}
 			return CBA_SUCCESS;
 		}
@@ -135,16 +135,16 @@ static void cmd_list(void *cmd)
 	uint8_t i = 0;
 	CMD_S *pos;
 
-	CMD_LOG(INFO, "============================================================\n");
+	CMD_LOG(INFO, "============================================================\r\n");
 	list_for_each_entry(pos, &cmd_head.list, CMD_S, list) {
 		if(strlen(pos->subcmd)) {
-			CMD_LOG(INFO, "%-2d: %s_%s\n", i++, pos->prefix, pos->subcmd);
+			CMD_LOG(INFO, "%-2d: %s_%s\r\n", i++, pos->prefix, pos->subcmd);
 		}
 		else {
-			CMD_LOG(INFO, "%-2d: %s\n", i++, pos->prefix);
+			CMD_LOG(INFO, "%-2d: %s\r\n", i++, pos->prefix);
 		}
 	}
-	CMD_LOG(INFO, "============================================================\n");
+	CMD_LOG(INFO, "============================================================\r\n");
 }
 CMD_CREATE(cmd, list, cmd_list);
 
@@ -152,17 +152,19 @@ void cmd_register(CMD_S *cmd)
 {
 	list_add_tail(&cmd->list, &cmd_head.list);
 	if(strlen(cmd->subcmd)) {
-		CMD_LOG(INFO, "register: [%s_%s]\n", cmd->prefix, cmd->subcmd);
+		CMD_LOG(INFO, "cmd_register: [%s_%s]\r\n", cmd->prefix, cmd->subcmd);
 	}
 	else {
-		CMD_LOG(INFO, "register: [%s]\n", cmd->prefix);
+		CMD_LOG(INFO, "cmd_register: [%s]\r\n", cmd->prefix);
 	}
 }
 
 void cmd_init(void)
 {
 	INIT_LIST_HEAD(&cmd_head.list);
+	gl_console.cmd_list = &cmd_head.list;
+
 	cmd_register(&cmd_cmd_list);
-	CMD_LOG(INFO, "%s ... OK\n", __func__);
+	CMD_LOG(INFO, "%s ... OK\r\n", __func__);
 }
 
